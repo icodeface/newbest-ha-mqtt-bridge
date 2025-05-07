@@ -1,0 +1,40 @@
+{
+    "serialConfig": {
+        "dataArray": [],
+        "status": "success"
+    },
+    "homeConfig": {
+        "data": {
+            "ZIGBEE": [],
+            "TASK": [],
+            "PATTERN": [],
+            "SELF_CHECK_TASK": [],
+            "HOME_ID": "AM-V12345-000000",
+            "SCENARIO": [],
+            "DEVICE_GROUP": [
+                {
+                    "REVISION": 1,
+                    "IMAGE": "",
+                    "PATTERN": [
+
+                    ],
+                    "HOME_ID": "AM-V12345-000000",
+                    "DEVICE_GROUP_ID": 8,
+                    "DEVICE": [
+
+                    ],
+                    "UPDATE_TIME": null,
+                    "ICON": "roomicon_keting.png",
+                    "PARENT_DEVICE_GROUP_ID": 0,
+                    "NAME": "默认区域"
+                }
+            ]
+        },
+        "status": "success"
+    },
+    "ruleConfig": {
+        "dataArray": [],
+        "HOME_ID": "AM-V12345-000000",
+        "status": "success"
+    }
+}
