@@ -1,0 +1,12 @@
+[Unit]
+Description=NewBest HomeAssistant MQTT Bridge
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root/newbest-ha-mqtt-bridge
+ExecStart=/root/.local/bin/uv run main.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
