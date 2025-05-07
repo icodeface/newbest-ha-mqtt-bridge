@@ -30,8 +30,8 @@ class DeviceType(enum.IntEnum):
     AC = 9                  # 空调
     FLOOR_HEATING = 10      # 地暖
     LIVING_ROOM_AC = 73     # 客厅空调开关/设置温度/风速/模式
-    LEGRAND_CONTROL = 83    # 罗格朗可视对讲
-    VMC = 301               # 新风
+    # LEGRAND_CONTROL = 83    # 罗格朗可视对讲
+    # VMC = 301               # 新风
 
 
 def load_knx_device_map():
@@ -60,13 +60,6 @@ def ha_push_config(info: dict):
         print("skip", info)
         return
     device_name = KNX_DEVICE_MAP[device_id][1]
-    on_off = info.get("On/Off") # "0" | "1"
-    room_point = info.get("RoomPoint")
-    set_point = info.get("SetPoint")
-    fan_speed = info.get("FanSpeed")
-    mode = info.get("Mode")
-    value_status = info.get("ValveStatus")
-
     if device_type_id == DeviceType.LIGHT:
         # https://www.home-assistant.io/integrations/light.mqtt/
         unique_id = f"knx_light_{device_id}"
@@ -79,14 +72,49 @@ def ha_push_config(info: dict):
             "command_topic": f"{topic_prefix}/set",
         }
         ha_mqtt.publish(topic, json.dumps(payload), 1, True)
-        if on_off == "1":
-            ha_mqtt.publish(f"{topic_prefix}/state", b"ON", 1, True)
-        elif on_off == "0":
-            ha_mqtt.publish(f"{topic_prefix}/state", b"OFF", 1, True)
+        ha_update_state(info)
     elif device_type_id == DeviceType.AC or device_type_id == DeviceType.LIVING_ROOM_AC:
-        print(device_name, on_off, room_point, set_point, fan_speed, mode)
+        unique_id = f"knx_ac_{device_id}"
+        topic_prefix = f"homeassistant/climate/{unique_id}"
+        topic = f"{topic_prefix}/config"
+        payload = {
+            "unique_id": unique_id,
+            "name": device_name,
+            "power_command_topic": f"{topic_prefix}/power/set",
+            "modes": ["off", "cool", "heat", "fan_only", "dry"],
+            "mode_command_topic": f"{topic_prefix}/mode/set",
+            "mode_state_topic": f"{topic_prefix}/mode/state",
+            "temperature_command_topic": f"{topic_prefix}/temperature/set",
+            "temperature_state_topic": f"{topic_prefix}/temperature/state",
+            "min_temp": 16,
+            "max_temp": 30,
+            "temp_step": 0.5,
+            "temperature_unit": "C",
+            "fan_modes": ["low", "medium", "high", "auto"],
+            "fan_mode_command_topic": f"{topic_prefix}/fan_mode/set",
+            "fan_mode_state_topic": f"{topic_prefix}/fan_mode/state"
+        }
+        ha_mqtt.publish(topic, json.dumps(payload), 1, True)
+        ha_update_state(info)
     elif device_type_id == DeviceType.FLOOR_HEATING:
-        print(device_name, room_point, value_status)
+        unique_id = f"knx_fh_{device_id}"
+        topic_prefix = f"homeassistant/climate/{unique_id}"
+        topic = f"{topic_prefix}/config"
+        payload = {
+            "unique_id": unique_id,
+            "name": device_name,
+            "modes": ["off", "heat"],
+            "mode_command_topic": f"{topic_prefix}/mode/set",
+            "mode_state_topic": f"{topic_prefix}/mode/state",
+            "temperature_command_topic": f"{topic_prefix}/temperature/set", # 设置目标温度
+            "temperature_state_topic": f"{topic_prefix}/temperature/state", # 当前目标温度
+            "min_temp": 10,
+            "max_temp": 30,
+            "temp_step": 0.5,
+            "temperature_unit": "C",
+        }
+        ha_mqtt.publish(topic, json.dumps(payload), 1, True)
+        ha_update_state(info)
     else:
         print(device_name, info)
 
@@ -96,14 +124,44 @@ def ha_update_state(state: dict):
         device_id, device_type_id = parse_device_id(state)
     except Exception:
         return
+    on_off = state.get("On/Off")
+    mode = state.get("Mode")                # 模式，制冷、制热之类的
+    room_point = state.get("RoomPoint")     # 实际温度
+    set_point = state.get("SetPoint")       # 目标温度
+    fan_speed = state.get("FanSpeed")
+    value_status = state.get("ValveStatus")
+
     if device_type_id == DeviceType.LIGHT:
-        on_off = state.get("On/Off")
         unique_id = f"knx_light_{device_id}"
         topic_prefix = f"homeassistant/light/{unique_id}"
         if on_off == "1":
             ha_mqtt.publish(f"{topic_prefix}/state", b"ON", 1, True)
         elif on_off == "0":
             ha_mqtt.publish(f"{topic_prefix}/state", b"OFF", 1, True)
+    elif device_type_id == DeviceType.AC or device_type_id == DeviceType.LIVING_ROOM_AC:
+        unique_id = f"knx_ac_{device_id}"
+        topic_prefix = f"homeassistant/climate/{unique_id}"
+        if on_off == "0":
+            ha_mqtt.publish(f"{topic_prefix}/mode/state", b"off", 1, True)
+        elif on_off == "1":
+            if mode == "1":
+                ha_mqtt.publish(f"{topic_prefix}/mode/state", b"cool", 1, True)
+            elif mode == "2":
+                ha_mqtt.publish(f"{topic_prefix}/mode/state", b"fan_only", 1, True)
+            elif mode == "3":
+                ha_mqtt.publish(f"{topic_prefix}/mode/state", b"dry", 1, True)
+            elif mode == "4":
+                ha_mqtt.publish(f"{topic_prefix}/mode/state", b"heat", 1, True)
+            if set_point:
+                ha_mqtt.publish(f"{topic_prefix}/temperature/state", set_point, 1, True)
+            if fan_speed == "5":
+                ha_mqtt.publish(f"{topic_prefix}/fan_mode/state", b"high", 1, True)
+            elif fan_speed == "3" or fan_speed == "4":
+                ha_mqtt.publish(f"{topic_prefix}/fan_mode/state", b"medium", 1, True)
+            elif fan_speed == "1" or fan_speed == "2":
+                ha_mqtt.publish(f"{topic_prefix}/fan_mode/state", b"low", 1, True)
+            elif fan_speed == "0":
+                ha_mqtt.publish(f"{topic_prefix}/fan_mode/state", b"auto", 1, True)
 
 
 def on_newbest_msg(_client, _userdata, msg: MQTTMessage):
@@ -123,22 +181,78 @@ def on_ha_connect(_client, _userdata, flags, reason, properties):
 def on_ha_message(_client, _userdata, msg: MQTTMessage):
     print("on_ha_msg", msg.topic, msg.payload)
     splits = msg.topic.split("/")
-    if len(splits) != 4:
+    if len(splits) == 4:
+        prefix, component, obj_id, cmd = splits
+        sub = None
+    elif len(splits) == 5:
+        prefix, component, obj_id, sub, cmd = splits
+    else:
         return
-    prefix, componet, obj_id, cmd = splits
     if prefix != "homeassistant":
         return
-    if cmd == "set":
-        if componet == "light":
-            device_id = obj_id.replace("knx_light_", "")
-            nb_topic = f"{NEWBEST_MQTT_TOPIC_PREFIX}/exec/"
-            is_on = msg.payload == b"ON"
+    is_on = msg.payload == b"ON"
+    nb_topic = f"{NEWBEST_MQTT_TOPIC_PREFIX}/exec/"
+    nb_payload = None
+    if component == "light" and cmd == "set":
+        device_id = obj_id.replace("knx_light_", "")
+        nb_payload = {
+            "On/Off": "1" if is_on else "0",
+            "deviceId": device_id,
+        }
+    elif component == "climate" and cmd == "set":
+        device_id = obj_id.replace("knx_ac_", "")
+        if sub == "power":
             nb_payload = {
                 "On/Off": "1" if is_on else "0",
                 "deviceId": device_id,
             }
-            newbest_mqtt.publish(nb_topic, json.dumps(nb_payload))
-            return
+        elif sub == "mode":
+            mode = None
+            if msg.payload == b"off":
+                nb_payload = {
+                    "On/Off": "0",
+                    "deviceId": device_id,
+                }
+            elif msg.payload == b"cool":
+                mode = "1"
+            elif msg.payload == b"fan_only":
+                mode = "2"
+            elif msg.payload == b"dry":
+                mode = "3"
+            elif msg.payload == b"heat":
+                mode = "4"
+            if mode:
+                # 需要先确保空调是开启的
+                newbest_mqtt.publish(nb_topic, json.dumps({
+                    "On/Off": "1",
+                    "deviceId": device_id,
+                }))
+                time.sleep(1)
+                nb_payload = {
+                    "Mode": mode,
+                    "deviceId": device_id,
+                }
+        elif sub == "temperature":
+            nb_payload = {
+                "SetPoint": msg.payload.decode("utf-8"),
+                "deviceId": device_id,
+            }
+        elif sub == "fan_mode":
+            speed = 0
+            if msg.payload == b"low":
+                speed = 1
+            elif msg.payload == b"medium":
+                speed = 3
+            elif msg.payload == b"high":
+                speed = 5
+            elif msg.payload == b"auto":
+                speed = 0
+            nb_payload = {
+                "FanSpeed": f"{speed}",
+                "deviceId": device_id,
+            }
+    if nb_payload:
+        newbest_mqtt.publish(nb_topic, json.dumps(nb_payload))
 
 
 def run():
@@ -162,6 +276,7 @@ def run():
     except KeyboardInterrupt:
         newbest_mqtt.loop_stop()
         ha_mqtt.loop_stop()
+
 
 if __name__ == "__main__":
     run()
