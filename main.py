@@ -164,6 +164,12 @@ def ha_update_state(state: dict):
                 ha_mqtt.publish(f"{topic_prefix}/fan_mode/state", b"auto", 1, True)
 
 
+def on_newbest_connect(_client, _userdata, flags, reason, properties):
+    print("on_newbest_connect", flags, reason, properties)
+    newbest_mqtt.subscribe(f"{NEWBEST_MQTT_TOPIC_PREFIX}/#")
+    newbest_mqtt.publish(f"{NEWBEST_MQTT_TOPIC_PREFIX}/home/statusInfo/", "{}")
+
+
 def on_newbest_msg(_client, _userdata, msg: MQTTMessage):
     print("on_newbest_msg", msg.topic, msg.payload)
     payload = json.loads(msg.payload.decode("utf-8"))
@@ -176,6 +182,7 @@ def on_newbest_msg(_client, _userdata, msg: MQTTMessage):
 
 def on_ha_connect(_client, _userdata, flags, reason, properties):
     print("on_ha_connect", flags, reason, properties)
+    ha_mqtt.subscribe("homeassistant/#")
 
 
 def on_ha_message(_client, _userdata, msg: MQTTMessage):
@@ -255,20 +262,38 @@ def on_ha_message(_client, _userdata, msg: MQTTMessage):
         newbest_mqtt.publish(nb_topic, json.dumps(nb_payload))
 
 
+def on_disconnect(client, userdata, rc, reason, properties):
+    print("Disconnected with result code " + str(rc))
+    if rc != 0:
+        print("Unexpected disconnection. Will attempt to reconnect.")
+        reconnect(client)
+
+
+def reconnect(client):
+    while True:
+        try:
+            client.reconnect()
+            print("Reconnected successfully")
+            break
+        except:
+            print("Reconnection failed, trying again in 5 seconds...")
+            time.sleep(5)  # 重连间隔时间
+
+
 def run():
     load_knx_device_map()
 
     ha_mqtt.connect(HA_MQTT_BROKER)
-    ha_mqtt.subscribe("homeassistant/#")
-    ha_mqtt.on_message = on_ha_message
     ha_mqtt.on_connect = on_ha_connect
+    ha_mqtt.on_message = on_ha_message
+    ha_mqtt.on_disconnect = on_disconnect
     ha_mqtt.loop_start()
 
     newbest_mqtt.connect(NEWBEST_MQTT_BROKER)
-    newbest_mqtt.subscribe(f"{NEWBEST_MQTT_TOPIC_PREFIX}/#")
+    newbest_mqtt.on_connect = on_newbest_connect
     newbest_mqtt.on_message = on_newbest_msg
+    newbest_mqtt.on_disconnect = on_disconnect
     newbest_mqtt.loop_start()
-    newbest_mqtt.publish(f"{NEWBEST_MQTT_TOPIC_PREFIX}/home/statusInfo/", "{}")
 
     try:
         while True:
