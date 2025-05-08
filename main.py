@@ -38,11 +38,12 @@ def load_knx_device_map():
     with open("./KNX-projectConfig.json", "r") as f:
         data = json.load(f)
         for group in data.get("homeConfig", {}).get("data", {}).get("DEVICE_GROUP", []):
+            area = group.get("NAME")
             for device in group.get("DEVICE", []):
                 device_type_id = device.get("DEVICE_TYPE_ID")
                 device_id = device.get("DEVICE_ID")
                 name = device.get("NAME")
-                KNX_DEVICE_MAP[device_id] = [device_type_id, name]
+                KNX_DEVICE_MAP[device_id] = [device_type_id, name, area]
 
 
 def parse_device_id(info: dict):
@@ -59,7 +60,7 @@ def ha_push_config(info: dict):
     if device_id not in KNX_DEVICE_MAP:
         print("skip", info)
         return
-    device_name = KNX_DEVICE_MAP[device_id][1]
+    device_name, area = KNX_DEVICE_MAP[device_id][1:]
     if device_type_id == DeviceType.LIGHT:
         # https://www.home-assistant.io/integrations/light.mqtt/
         unique_id = f"knx_light_{device_id}"
@@ -70,8 +71,13 @@ def ha_push_config(info: dict):
             "name": device_name,
             "state_topic": f"{topic_prefix}/state",
             "command_topic": f"{topic_prefix}/set",
+            "device": {
+                "name": "",
+                "suggested_area": area,
+                "identifiers": [unique_id]
+            },
         }
-        ha_mqtt.publish(topic, json.dumps(payload), 1, True)
+        ha_mqtt.publish(topic, json.dumps(payload), 1, False)
         ha_update_state(info)
     elif device_type_id == DeviceType.AC or device_type_id == DeviceType.LIVING_ROOM_AC:
         unique_id = f"knx_ac_{device_id}"
@@ -92,9 +98,14 @@ def ha_push_config(info: dict):
             "temperature_unit": "C",
             "fan_modes": ["low", "medium", "high", "auto"],
             "fan_mode_command_topic": f"{topic_prefix}/fan_mode/set",
-            "fan_mode_state_topic": f"{topic_prefix}/fan_mode/state"
+            "fan_mode_state_topic": f"{topic_prefix}/fan_mode/state",
+            "device": {
+                "name": "",
+                "suggested_area": area,
+                "identifiers": [unique_id]
+            },
         }
-        ha_mqtt.publish(topic, json.dumps(payload), 1, True)
+        ha_mqtt.publish(topic, json.dumps(payload), 1, False)
         ha_update_state(info)
     elif device_type_id == DeviceType.FLOOR_HEATING:
         unique_id = f"knx_fh_{device_id}"
@@ -112,8 +123,13 @@ def ha_push_config(info: dict):
             "max_temp": 30,
             "temp_step": 0.5,
             "temperature_unit": "C",
+            "device": {
+                "name": "",
+                "suggested_area": area,
+                "identifiers": [unique_id]
+            },
         }
-        ha_mqtt.publish(topic, json.dumps(payload), 1, True)
+        ha_mqtt.publish(topic, json.dumps(payload), 1, False)
         ha_update_state(info)
     else:
         print(device_name, info)
