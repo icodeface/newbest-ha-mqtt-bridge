@@ -92,6 +92,7 @@ def ha_push_config(info: dict):
             "mode_state_topic": f"{topic_prefix}/mode/state",
             "temperature_command_topic": f"{topic_prefix}/temperature/set",
             "temperature_state_topic": f"{topic_prefix}/temperature/state",
+            "current_temperature_topic": f"{topic_prefix}/current_temperature/state",
             "min_temp": 16,
             "max_temp": 30,
             "temp_step": 0.5,
@@ -119,6 +120,7 @@ def ha_push_config(info: dict):
             "mode_state_topic": f"{topic_prefix}/mode/state",
             "temperature_command_topic": f"{topic_prefix}/temperature/set", # 设置目标温度
             "temperature_state_topic": f"{topic_prefix}/temperature/state", # 当前目标温度
+            "current_temperature_topic": f"{topic_prefix}/current_temperature/state",
             "min_temp": 10,
             "max_temp": 30,
             "temp_step": 0.5,
@@ -154,7 +156,7 @@ def ha_update_state(state: dict):
             ha_mqtt.publish(f"{topic_prefix}/state", b"ON", 1, True)
         elif on_off == "0":
             ha_mqtt.publish(f"{topic_prefix}/state", b"OFF", 1, True)
-    elif device_type_id == DeviceType.AC or device_type_id == DeviceType.LIVING_ROOM_AC:
+    elif device_type_id in [DeviceType.AC, DeviceType.LIVING_ROOM_AC]:
         unique_id = f"knx_ac_{device_id}"
         topic_prefix = f"homeassistant/climate/{unique_id}"
         if on_off == "0":
@@ -168,8 +170,6 @@ def ha_update_state(state: dict):
                 ha_mqtt.publish(f"{topic_prefix}/mode/state", b"dry", 1, True)
             elif mode == "4":
                 ha_mqtt.publish(f"{topic_prefix}/mode/state", b"heat", 1, True)
-            if set_point:
-                ha_mqtt.publish(f"{topic_prefix}/temperature/state", set_point, 1, True)
             if fan_speed == "5":
                 ha_mqtt.publish(f"{topic_prefix}/fan_mode/state", b"high", 1, True)
             elif fan_speed == "3" or fan_speed == "4":
@@ -178,6 +178,21 @@ def ha_update_state(state: dict):
                 ha_mqtt.publish(f"{topic_prefix}/fan_mode/state", b"low", 1, True)
             elif fan_speed == "0":
                 ha_mqtt.publish(f"{topic_prefix}/fan_mode/state", b"auto", 1, True)
+        if set_point:
+            ha_mqtt.publish(f"{topic_prefix}/temperature/state", set_point, 1, True)
+        if room_point:
+            ha_mqtt.publish(f"{topic_prefix}/current_temperature/state", room_point, 1, True)
+    elif device_type_id == DeviceType.FLOOR_HEATING:
+        unique_id = f"knx_fh_{device_id}"
+        topic_prefix = f"homeassistant/climate/{unique_id}"
+        if value_status == "0":
+            ha_mqtt.publish(f"{topic_prefix}/mode/state", b"off", 1, True)
+        elif value_status == "1":
+            ha_mqtt.publish(f"{topic_prefix}/mode/state", b"heat", 1, True)
+        if set_point:
+            ha_mqtt.publish(f"{topic_prefix}/temperature/state", set_point, 1, True)
+        if room_point:
+            ha_mqtt.publish(f"{topic_prefix}/current_temperature/state", room_point, 1, True)
 
 
 def on_newbest_connect(_client, _userdata, flags, reason, properties):
