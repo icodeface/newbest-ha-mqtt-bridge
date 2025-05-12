@@ -214,6 +214,8 @@ def on_newbest_msg(_client, _userdata, msg: MQTTMessage):
 def on_ha_connect(_client, _userdata, flags, reason, properties):
     print("on_ha_connect", flags, reason, properties)
     ha_mqtt.subscribe("homeassistant/#")
+    if newbest_mqtt.is_connected():
+        newbest_mqtt.publish(f"{NEWBEST_MQTT_TOPIC_PREFIX}/home/statusInfo/", "{}")
 
 
 def on_ha_message(_client, _userdata, msg: MQTTMessage):
