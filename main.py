@@ -195,10 +195,15 @@ def ha_update_state(state: dict):
             ha_mqtt.publish(f"{topic_prefix}/current_temperature/state", room_point, 1, True)
 
 
+def request_status_info():
+    newbest_mqtt.publish(f"{NEWBEST_MQTT_TOPIC_PREFIX}/home/statusInfo/", "{}")
+
+
 def on_newbest_connect(_client, _userdata, flags, reason, properties):
     print("on_newbest_connect", flags, reason, properties)
     newbest_mqtt.subscribe(f"{NEWBEST_MQTT_TOPIC_PREFIX}/#")
-    newbest_mqtt.publish(f"{NEWBEST_MQTT_TOPIC_PREFIX}/home/statusInfo/", "{}")
+    if ha_mqtt.is_connected():
+        request_status_info()
 
 
 def on_newbest_msg(_client, _userdata, msg: MQTTMessage):
@@ -215,7 +220,7 @@ def on_ha_connect(_client, _userdata, flags, reason, properties):
     print("on_ha_connect", flags, reason, properties)
     ha_mqtt.subscribe("homeassistant/#")
     if newbest_mqtt.is_connected():
-        newbest_mqtt.publish(f"{NEWBEST_MQTT_TOPIC_PREFIX}/home/statusInfo/", "{}")
+        request_status_info()
 
 
 def on_ha_message(_client, _userdata, msg: MQTTMessage):
@@ -330,7 +335,9 @@ def run():
 
     try:
         while True:
-            time.sleep(3)
+            time.sleep(180)
+            if ha_mqtt.is_connected() and newbest_mqtt.is_connected():
+                request_status_info()
     except KeyboardInterrupt:
         newbest_mqtt.loop_stop()
         ha_mqtt.loop_stop()
