@@ -297,6 +297,7 @@ def on_ha_message(_client, _userdata, msg: MQTTMessage):
                 "deviceId": device_id,
             }
     if nb_payload:
+        nb_payload["execMobile"] = "13888888888"
         newbest_mqtt.publish(nb_topic, json.dumps(nb_payload))
 
 
