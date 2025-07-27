@@ -6,7 +6,8 @@ After=network.target
 User=root
 WorkingDirectory=/root/newbest-ha-mqtt-bridge
 ExecStart=/root/.local/bin/uv run main.py
-Restart=always
+Restart=on-failure
+RestartSec=60s
 
 [Install]
 WantedBy=multi-user.target

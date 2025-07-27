@@ -339,9 +339,12 @@ def run():
             time.sleep(180)
             if ha_mqtt.is_connected() and newbest_mqtt.is_connected():
                 request_status_info()
+            else:
+                print("Not connected")
     except KeyboardInterrupt:
         newbest_mqtt.loop_stop()
         ha_mqtt.loop_stop()
+        print("Quited")
 
 
 if __name__ == "__main__":
