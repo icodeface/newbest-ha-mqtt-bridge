@@ -1,7 +1,7 @@
 # NewBest-HomeAssistant MQTT Bridge
 
 ## Usage
-1. Find ip of NewBest Admin, login with username is `newbest` and password `pass`
+1. Find ip of NewBest Admin, login with username `newbest` and password `pass`
 2. Export `projectConfig.json` from NewBest Admin, save as `KNX-projectConfig.json`
 3. Get `NEWBEST_MQTT_BROKER`, `NEWBEST_MQTT_USER`, `NEWBEST_MQTT_PWD` from NewBest Admin, set them in `.env`
 4. Get `NEWBEST_MQTT_HOME` by subscribing the topic `newbest/+/exec/`, set it in `.env`
