@@ -12,3 +12,7 @@
 - `systemctl daemon-reload`
 - `systemctl start nb_ha_bridge`
 - `systemctl enable nb_ha_bridge`
+
+### abandon newbest's mqtt broker(optional)
+1. Change the broker url in NewBest Admin to mosquitto's
+2. Make `NEWBEST_MQTT_BROKER`, `NEWBEST_MQTT_USER`, `NEWBEST_MQTT_PWD` the same as `HA_MQTT_BROKER`, `HA_MQTT_USER` and `HA_MQTT_PWD`
