@@ -16,4 +16,4 @@
 
 ### Optional: replace newbest's mqtt broker to self-host one
 1. Change the broker url in NewBest Admin to mosquitto's
-2. Make `NEWBEST_MQTT_BROKER`, `NEWBEST_MQTT_USER`, `NEWBEST_MQTT_PWD` the same as `HA_MQTT_BROKER`, `HA_MQTT_USER` and `HA_MQTT_PWD`
+2. Edit `.env`, make `NEWBEST_MQTT_BROKER`, `NEWBEST_MQTT_USER`, `NEWBEST_MQTT_PWD` the same as `HA_MQTT_BROKER`, `HA_MQTT_USER` and `HA_MQTT_PWD`
