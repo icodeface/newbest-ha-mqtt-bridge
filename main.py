@@ -24,14 +24,16 @@ ha_mqtt = mqtt.Client(CallbackAPIVersion.VERSION2)
 ha_mqtt.username_pw_set(HA_MQTT_USER, HA_MQTT_PWD)
 
 KNX_DEVICE_MAP = {}
+device_current_mode = {}
 
 class DeviceType(enum.IntEnum):
     LIGHT = 6               # 灯
     AC = 9                  # 空调
     FLOOR_HEATING = 10      # 地暖
     LIVING_ROOM_AC = 73     # 客厅空调开关/设置温度/风速/模式
+    VMC = 301               # 新风
     # LEGRAND_CONTROL = 83    # 罗格朗可视对讲
-    # VMC = 301               # 新风
+    
 
 
 def load_knx_device_map():
@@ -133,6 +135,33 @@ def ha_push_config(info: dict):
         }
         ha_mqtt.publish(topic, json.dumps(payload), 1, False)
         ha_update_state(info)
+    elif device_type_id == DeviceType.VMC:
+        # 新风设备配置
+        unique_id = f"knx_vmc_{device_id}"
+        topic_prefix = f"homeassistant/fan/{unique_id}"
+        topic = f"{topic_prefix}/config"
+        payload = {
+            "unique_id": unique_id,
+            "name": device_name,
+            "state_topic": f"{topic_prefix}/state",
+            "command_topic": f"{topic_prefix}/set",
+            "percentage_state_topic": f"{topic_prefix}/percentage/state",
+            "percentage_command_topic": f"{topic_prefix}/percentage/set",
+            "speed_range_min": 1,
+            "speed_range_max": 3,
+            "preset_modes": ["新风", "自动"],
+            "preset_mode_state_topic": f"{topic_prefix}/preset_mode/state",
+            "preset_mode_command_topic": f"{topic_prefix}/preset_mode/set",
+            "device": {
+                "name": "",
+                "identifiers": [unique_id]
+            },
+        }
+        ha_mqtt.publish(topic, json.dumps(payload), 1, False)
+        # 默认初始化为新风模式
+        if device_id not in device_current_mode:
+            device_current_mode[device_id] = "新风"
+        ha_update_state(info)
     else:
         print(device_name, info)
 
@@ -148,8 +177,30 @@ def ha_update_state(state: dict):
     set_point = state.get("SetPoint")       # 目标温度
     fan_speed = state.get("FanSpeed")
     value_status = state.get("ValveStatus")
+    wind = state.get("Wind")                # 新风风速
+    purify_mode = state.get("PurifyMode")   # 新风模式：1=新风, 2=自动
 
-    if device_type_id == DeviceType.LIGHT:
+    if device_type_id == DeviceType.VMC:
+        unique_id = f"knx_vmc_{device_id}"
+        topic_prefix = f"homeassistant/fan/{unique_id}"
+        # 开关状态
+        if on_off == "1":
+            ha_mqtt.publish(f"{topic_prefix}/state", b"ON", 1, True)
+        elif on_off == "0":
+            ha_mqtt.publish(f"{topic_prefix}/state", b"OFF", 1, True)
+        # 风速状态
+        if wind:
+            try:
+                speed_val = int(wind) if wind in ["1", "2", "3"] else 1
+            except:
+                speed_val = 1
+            ha_mqtt.publish(f"{topic_prefix}/percentage/state", str(speed_val), 1, True)
+        # 模式状态
+        if purify_mode:
+            mode_str = "自动" if purify_mode == "2" else "新风"
+            ha_mqtt.publish(f"{topic_prefix}/preset_mode/state", mode_str, 1, True)
+            device_current_mode[device_id] = mode_str
+    elif device_type_id == DeviceType.LIGHT:
         unique_id = f"knx_light_{device_id}"
         topic_prefix = f"homeassistant/light/{unique_id}"
         if on_off == "1":
@@ -244,6 +295,30 @@ def on_ha_message(_client, _userdata, msg: MQTTMessage):
             "On/Off": "1" if is_on else "0",
             "deviceId": device_id,
         }
+    elif component == "fan" and cmd == "set":
+        device_id = obj_id.replace("knx_vmc_", "")
+        if sub is None:
+            # 开关控制
+            nb_payload = {
+                "On/Off": "1" if is_on else "0",
+                "deviceId": device_id,
+            }
+        elif sub == "percentage":
+            # 调节风速时强制切到新风模式
+            nb_payload = {
+                "On/Off": "1",
+                "Wind": msg.payload.decode("utf-8"),
+                "PurifyMode": "1",
+                "deviceId": device_id,
+            }
+        elif sub == "preset_mode":
+            # 模式切换：新风/自动
+            mode_val = "2" if msg.payload.decode("utf-8") == "自动" else "1"
+            nb_payload = {
+                "On/Off": "1",
+                "PurifyMode": mode_val,
+                "deviceId": device_id,
+            }
     elif component == "climate" and cmd == "set":
         device_id = obj_id.replace("knx_ac_", "")
         if sub == "power":
